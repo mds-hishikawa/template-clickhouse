@@ -1,0 +1,40 @@
+# templates_source/_common/github_actions_workflow.yml
+name: CI/CD Deploy para Homelab
+
+on:
+  push:
+    branches:
+      - 'develop'
+      - 'release/v*.*'
+      - 'main'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Checkout do código
+        uses: actions/checkout@v3
+
+      - name: 2. Definir variáveis do ambiente
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            echo "TARGET_HOST=${{ secrets.PROD_HOST }}" >> $GITHUB_ENV
+            echo "TARGET_USER=${{ secrets.PROD_USER }}" >> $GITHUB_ENV
+          elif [[ "$BRANCH_NAME" == release/v* ]]; then
+            echo "TARGET_HOST=${{ secrets.HMG_HOST }}" >> $GITHUB_ENV
+            echo "TARGET_USER=${{ secrets.HMG_USER }}" >> $GITHUB_ENV
+          else
+            echo "TARGET_HOST=${{ secrets.DEV_HOST }}" >> $GITHUB_ENV
+            echo "TARGET_USER=${{ secrets.DEV_USER }}" >> $GITHUB_ENV
+          fi
+
+      - name: 3. Configurar chave SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: 4. Executar script de Deploy
+        run: |
+          chmod +x ./scripts/deploy.sh
+          ./scripts/deploy.sh ${{ env.TARGET_USER }} ${{ env.TARGET_HOST }}
